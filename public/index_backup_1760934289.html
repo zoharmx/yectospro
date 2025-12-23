@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YectosPro - Gestión Profesional de Proyectos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
+        .dark { background-color: #1a202c; color: #e2e8f0; }
+        .dark .bg-white { background-color: #2d3748; }
+        .dark .text-gray-900 { color: #e2e8f0; }
+        .dark .text-gray-600 { color: #a0aec0; }
+        .dark .text-gray-700 { color: #cbd5e0; }
+        .dark .border-gray-200 { border-color: #4a5568; }
+        .dark .bg-gray-50 { background-color: #2d3748; }
+        .dark .bg-gray-100 { background-color: #374151; }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+        .animate-slide-in-up { animation: slideInUp 0.5s ease-out; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .animate-slide-in-right { animation: slideInRight 0.3s ease-out; }
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 1000px 100%; animation: shimmer 2s infinite; }
+        .toast { animation: slideInUp 0.3s ease-out; }
+        .project-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .project-card:hover { transform: translateY(-8px); }
+        .progress-bar { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkxPYfXyXMLpMJl-7DmuJ0k6eLTVoXQZg",
+            authDomain: "yectospro.firebaseapp.com",
+            projectId: "yectospro",
+            storageBucket: "yectospro.firebasestorage.app",
+            messagingSenderId: "67673665043",
+            appId: "1:67673665043:web:9eb85cbe59f42153f899e6",
+            measurementId: "G-MZLJEXFMYP"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Icons
+        const PlusIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
+        const XIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+        const TrashIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+        const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
+        const CheckIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
+        const DownloadIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+
+        // Utility Functions
+        const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return new Intl.DateTimeFormat('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+        };
+
+        const exportToCSV = (projects) => {
+            const headers = ['Nombre,Cliente,Costo Total,Pagado,Pendiente,Progreso'];
+            const rows = projects.map(p => {
+                const progress = p.stages?.length > 0 ? Math.round((p.stages.filter(s => s.completed).length / p.stages.length) * 100) : 0;
+                return `"${p.name}","${p.client}",${p.totalCost},${p.amountPaid},${p.totalCost - p.amountPaid},${progress}%`;
+            });
+            const csv = [headers, ...rows].join('\\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `proyectos_${Date.now()}.csv`;
+            a.click();
+        };
+
+        // Toast System
+        const useToast = () => {
+            const [toasts, setToasts] = useState([]);
+            const addToast = useCallback((message, type = 'info') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, message, type }]);
+                setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+            }, []);
+            const removeToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []);
+            return { toasts, addToast, removeToast };
+        };
+
+        const ToastContainer = ({ toasts, removeToast }) => (
+            <div className="fixed top-4 right-4 z-50 space-y-3 max-w-md">
+                {toasts.map(toast => (
+                    <div key={toast.id} className={`toast flex items-start gap-3 p-4 rounded-lg shadow-2xl ${toast.type === 'success' ? 'bg-green-50 border border-green-200' : toast.type === 'error' ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
+                        <div className="flex-1">
+                            <p className={`text-sm font-semibold ${toast.type === 'success' ? 'text-green-800' : toast.type === 'error' ? 'text-red-800' : 'text-blue-800'}`}>{toast.message}</p>
+                        </div>
+                        <button onClick={() => removeToast(toast.id)} className="text-gray-400 hover:text-gray-600"><XIcon /></button>
+                    </div>
+                ))}
+            </div>
+        );
+
+        // Login Screen
+        function LoginScreen() {
+            const [mode, setMode] = useState('login');
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState('');
+
+            const handleEmailLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } catch (err) {
+                    setError(err.code === 'auth/user-not-found' ? 'Usuario no encontrado' : err.code === 'auth/wrong-password' ? 'Contraseña incorrecta' : 'Error al iniciar sesión');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleRegister = async (e) => {
+                e.preventDefault();
+                if (password !== confirmPassword) { setError('Las contraseñas no coinciden'); return; }
+                if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return; }
+                setLoading(true);
+                setError('');
+                try {
+                    await auth.createUserWithEmailAndPassword(email, password);
+                } catch (err) {
+                    setError(err.code === 'auth/email-already-in-use' ? 'El correo ya está registrado' : 'Error al crear la cuenta');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handlePasswordReset = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+                setSuccess('');
+                try {
+                    await auth.sendPasswordResetEmail(email);
+                    setSuccess('Correo de recuperación enviado');
+                    setTimeout(() => setMode('login'), 3000);
+                } catch (err) {
+                    setError('Error al enviar el correo');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleGoogleLogin = async () => {
+                setLoading(true);
+                setError('');
+                try {
+                    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                } catch (err) {
+                    setError('Error al iniciar sesión con Google');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 max-w-md w-full animate-slide-in-up">
+                        <div className="text-center mb-8">
+                            <div className="mb-6 inline-block p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl">
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </div>
+                            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">YectosPro</h1>
+                            <p className="text-gray-600">{mode === 'login' ? 'Inicia sesión' : mode === 'register' ? 'Crea tu cuenta' : 'Recupera tu contraseña'}</p>
+                        </div>
+
+                        {error && <div className="bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg mb-6"><p className="font-medium">{error}</p></div>}
+                        {success && <div className="bg-green-50 border-l-4 border-green-500 text-green-800 px-4 py-3 rounded-lg mb-6"><p className="font-medium">{success}</p></div>}
+
+                        <form onSubmit={mode === 'login' ? handleEmailLogin : mode === 'register' ? handleRegister : handlePasswordReset} className="space-y-4">
+                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo electrónico" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required />
+                            {mode !== 'reset' && <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required />}
+                            {mode === 'register' && <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirmar contraseña" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required />}
+                            <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
+                                {loading ? 'Cargando...' : mode === 'login' ? 'Iniciar Sesión' : mode === 'register' ? 'Crear Cuenta' : 'Enviar'}
+                            </button>
+                        </form>
+
+                        {mode === 'login' && (
+                            <div className="mt-4 text-right">
+                                <button onClick={() => { setMode('reset'); setError(''); }} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold">¿Olvidaste tu contraseña?</button>
+                            </div>
+                        )}
+
+                        <div className="mt-6">
+                            <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">O continúa con</span></div></div>
+                            <button onClick={handleGoogleLogin} disabled={loading} className="mt-4 w-full bg-white border-2 border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 disabled:opacity-50">Google</button>
+                        </div>
+
+                        <div className="mt-6 text-center">
+                            {mode === 'login' && <p className="text-sm text-gray-600">¿No tienes cuenta? <button onClick={() => { setMode('register'); setError(''); }} className="text-indigo-600 font-semibold">Regístrate</button></p>}
+                            {(mode === 'register' || mode === 'reset') && <p className="text-sm text-gray-600">¿Ya tienes cuenta? <button onClick={() => { setMode('login'); setError(''); setSuccess(''); }} className="text-indigo-600 font-semibold">Inicia sesión</button></p>}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [projects, setProjects] = useState([]);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [isFormOpen, setIsFormOpen] = useState(false);
+            const [deletingId, setDeletingId] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+            const { toasts, addToast, removeToast } = useToast();
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    setUser(user);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const unsubscribe = db.collection('projects').where('userId', '==', user.uid).orderBy('createdAt', 'desc').onSnapshot(
+                    (snapshot) => setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => addToast('Error al cargar proyectos', 'error')
+                );
+                return () => unsubscribe();
+            }, [user]);
+
+            const handleSaveProject = async (projectData) => {
+                try {
+                    if (projectData.id) {
+                        const { id, ...data } = projectData;
+                        await db.collection('projects').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        addToast('Proyecto actualizado', 'success');
+                    } else {
+                        await db.collection('projects').add({ ...projectData, userId: user.uid, amountPaid: 0, stages: projectData.stages.map(s => ({ ...s, completed: false })), createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        addToast('Proyecto creado', 'success');
+                    }
+                } catch (error) {
+                    addToast('Error al guardar', 'error');
+                }
+            };
+
+            const handleDelete = async (id) => {
+                try {
+                    await db.collection('projects').doc(id).delete();
+                    setDeletingId(null);
+                    addToast('Proyecto eliminado', 'success');
+                } catch (error) {
+                    addToast('Error al eliminar', 'error');
+                }
+            };
+
+            const filteredProjects = useMemo(() => {
+                if (!searchQuery) return projects;
+                return projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.client.toLowerCase().includes(searchQuery.toLowerCase()));
+            }, [projects, searchQuery]);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-20 w-20 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
+                            <p className="mt-6 text-lg text-gray-700 font-semibold">Cargando...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!user) return <LoginScreen />;
+
+            return (
+                <div className="min-h-screen pb-12">
+                    <ToastContainer toasts={toasts} removeToast={removeToast} />
+                    <div className="container mx-auto px-4 py-8">
+                        <header className="mb-10">
+                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                                <div>
+                                    <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">YectosPro</h1>
+                                    <p className="text-gray-600 mt-2">Bienvenido, <span className="font-bold text-indigo-600">{user.email}</span></p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => exportToCSV(projects)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"><DownloadIcon /> Exportar CSV</button>
+                                    <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700"><PlusIcon /> Crear Proyecto</button>
+                                    <button onClick={() => auth.signOut()} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300">Salir</button>
+                                </div>
+                            </div>
+                            {projects.length > 0 && (
+                                <div className="mt-6">
+                                    <input type="text" placeholder="Buscar proyectos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-96 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20" />
+                                </div>
+                            )}
+                        </header>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+                                <p className="text-blue-100 text-sm">Total Proyectos</p>
+                                <p className="text-3xl font-bold mt-2">{projects.length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+                                <p className="text-green-100 text-sm">Completados</p>
+                                <p className="text-3xl font-bold mt-2">{projects.filter(p => p.stages?.every(s => s.completed)).length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white">
+                                <p className="text-yellow-100 text-sm">En Progreso</p>
+                                <p className="text-3xl font-bold mt-2">{projects.filter(p => p.stages?.some(s => s.completed) && !p.stages?.every(s => s.completed)).length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                                <p className="text-purple-100 text-sm">Ingresos Totales</p>
+                                <p className="text-2xl font-bold mt-2">{formatCurrency(projects.reduce((sum, p) => sum + (p.totalCost || 0), 0))}</p>
+                            </div>
+                        </div>
+
+                        {filteredProjects.length === 0 ? (
+                            <div className="text-center py-20">
+                                <h2 className="text-3xl font-bold text-gray-800 mb-3">{searchQuery ? 'No se encontraron proyectos' : 'No tienes proyectos aún'}</h2>
+                                <p className="text-gray-600 mb-8">{searchQuery ? 'Intenta otra búsqueda' : 'Comienza creando tu primer proyecto'}</p>
+                                {!searchQuery && <button onClick={() => setIsFormOpen(true)} className="inline-flex items-center gap-2 bg-indigo-600 text-white font-bold py-4 px-8 rounded-xl hover:bg-indigo-700"><PlusIcon /> Crear Primer Proyecto</button>}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {filteredProjects.map(project => (
+                                    <div key={project.id} className="project-card bg-white rounded-2xl shadow-lg overflow-hidden">
+                                        <div className="p-6">
+                                            <h3 className="text-xl font-bold text-gray-900">{project.name}</h3>
+                                            <p className="text-sm text-indigo-600 mt-1">{project.client}</p>
+                                            <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                                                <div><p className="text-xs text-gray-500">Total</p><p className="font-bold">{formatCurrency(project.totalCost)}</p></div>
+                                                <div><p className="text-xs text-gray-500">Pagado</p><p className="font-bold text-green-600">{formatCurrency(project.amountPaid)}</p></div>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 border-t flex gap-2">
+                                            <button onClick={() => setSelectedProject(project)} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">Ver</button>
+                                            <button onClick={() => setDeletingId(project.id)} className="bg-red-100 text-red-700 px-4 rounded-lg hover:bg-red-200"><TrashIcon /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {deletingId && (
+                        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setDeletingId(null)}>
+                            <div className="bg-white rounded-2xl p-6 max-w-md" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-xl font-bold mb-2">¿Eliminar proyecto?</h3>
+                                <p className="text-gray-600 mb-6">Esta acción no se puede deshacer</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setDeletingId(null)} className="flex-1 bg-gray-200 py-2 rounded-lg">Cancelar</button>
+                                    <button onClick={() => handleDelete(deletingId)} className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

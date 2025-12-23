@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s /b)",
+      "Bash(firebase deploy)",
+      "Bash(firebase deploy --only hosting)",
+      "Bash(firebase hosting:channel:deploy preview --expires 1h)",
+      "Bash(node --version)",
+      "Bash(python3 -c \"\nhtml = ''''''ARCHIVO HTML COMPLETO AQUÍ''''''\nwith open(''public/index.html'', ''w'', encoding=''utf-8'') as f:\n    f.write(html)\nprint(''Archivo creado'')\n\")",
+      "Bash(python -c \"\nhtml = ''''''ARCHIVO HTML COMPLETO AQUÍ''''''\nwith open(''public/index.html'', ''w'', encoding=''utf-8'') as f:\n    f.write(html)\nprint(''Archivo creado'')\n\")",
+      "Bash(curl -o public/index.html.template \"https://gist.githubusercontent.com/anonymous/placeholder/raw/yectos_complete.html\")",
+      "Bash(node fix-html.js)",
+      "Bash(del fix-html.js)",
+      "Bash(node generate-complete.js)",
+      "Bash(firebase deploy:*)",
+      "Bash(firebase login:list:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

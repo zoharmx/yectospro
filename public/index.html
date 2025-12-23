@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YectosPro - Gestión Profesional de Proyectos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
+        .dark { background-color: #1a202c; color: #e2e8f0; }
+        .dark .bg-white { background-color: #2d3748; }
+        .dark .text-gray-900 { color: #e2e8f0; }
+        .dark .text-gray-600 { color: #a0aec0; }
+        .dark .text-gray-700 { color: #cbd5e0; }
+        .dark .border-gray-200 { border-color: #4a5568; }
+        .dark .bg-gray-50 { background-color: #2d3748; }
+        .dark .bg-gray-100 { background-color: #374151; }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-slide-in-up { animation: slideInUp 0.5s ease-out; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .toast { animation: slideInUp 0.3s ease-out; }
+        .project-card { transition: all 0.3s ease; }
+        .project-card:hover { transform: translateY(-8px); }
+        .progress-bar { transition: width 0.6s ease; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        firebase.initializeApp({
+            apiKey: "AIzaSyCkxPYfXyXMLpMJl-7DmuJ0k6eLTVoXQZg",
+            authDomain: "yectospro.firebaseapp.com",
+            projectId: "yectospro",
+            storageBucket: "yectospro.firebasestorage.app",
+            messagingSenderId: "67673665043",
+            appId: "1:67673665043:web:9eb85cbe59f42153f899e6"
+        });
+
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Dark Mode Hook
+        const useDarkMode = () => {
+            const [isDark, setIsDark] = useState(() => {
+                const saved = localStorage.getItem('darkMode');
+                return saved ? JSON.parse(saved) : false;
+            });
+            useEffect(() => {
+                localStorage.setItem('darkMode', JSON.stringify(isDark));
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    document.body.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.body.classList.remove('dark');
+                }
+            }, [isDark]);
+            return [isDark, setIsDark];
+        };
+
+        // Icons
+        const Icon = ({d}) => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} /></svg>;
+        const PlusIcon = () => <Icon d="M12 4v16m8-8H4" />;
+        const XIcon = () => <Icon d="M6 18L18 6M6 6l12 12" />;
+        const TrashIcon = () => <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />;
+        const EditIcon = () => <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />;
+        const DownloadIcon = () => <Icon d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />;
+        const MoonIcon = () => <Icon d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />;
+        const SunIcon = () => <Icon d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />;
+        const MessageIcon = () => <Icon d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />;
+        const ShareIcon = () => <Icon d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />;
+        const DollarIcon = () => <Icon d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />;
+        const ChartIcon = () => <Icon d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />;
+        const ClockIcon = () => <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />;
+        const CheckIcon = () => <Icon d="M5 13l4 4L19 7" />;
+
+        // Utils
+        const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return new Intl.DateTimeFormat('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+        };
+        const formatDateShort = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return new Intl.DateTimeFormat('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+        };
+        const exportToCSV = (projects) => {
+            const csv = ['Nombre,Cliente,Total,Pagado,Pendiente', ...projects.map(p => `"${p.name}","${p.client}",${p.totalCost},${p.amountPaid},${p.totalCost - p.amountPaid}`)].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `proyectos_${Date.now()}.csv`;
+            a.click();
+        };
+        const copyToClipboard = (text) => {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+        };
+
+        // Toast Hook
+        const useToast = () => {
+            const [toasts, setToasts] = useState([]);
+            const addToast = useCallback((message, type = 'info') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, message, type }]);
+                setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+            }, []);
+            return { toasts, addToast, removeToast: useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []) };
+        };
+
+        const ToastContainer = ({ toasts, removeToast }) => (
+            <div className="fixed top-4 right-4 z-50 space-y-3 max-w-md">
+                {toasts.map(toast => {
+                    const bgClass = toast.type === 'success' ? 'bg-green-50 border border-green-200' : toast.type === 'error' ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200';
+                    const textClass = toast.type === 'success' ? 'text-green-800' : toast.type === 'error' ? 'text-red-800' : 'text-blue-800';
+                    return (
+                        <div key={toast.id} className={`toast flex items-start gap-3 p-4 rounded-lg shadow-2xl ${bgClass}`}>
+                            <p className={`text-sm font-semibold flex-1 ${textClass}`}>{toast.message}</p>
+                            <button onClick={() => removeToast(toast.id)} className="text-gray-400 hover:text-gray-600"><XIcon /></button>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+
+        // Charts Component
+        const ProjectCharts = ({ projects }) => {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            useEffect(() => {
+                if (!chartRef.current || projects.length === 0) return;
+
+                // Destroy previous chart
+                if (chartInstance.current) {
+                    chartInstance.current.destroy();
+                }
+
+                const ctx = chartRef.current.getContext('2d');
+
+                // Prepare data
+                const completed = projects.filter(p => p.stages?.every(s => s.completed)).length;
+                const inProgress = projects.filter(p => p.stages?.some(s => s.completed) && !p.stages?.every(s => s.completed)).length;
+                const notStarted = projects.filter(p => !p.stages?.some(s => s.completed)).length;
+
+                chartInstance.current = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Completados', 'En Progreso', 'No Iniciados'],
+                        datasets: [{
+                            data: [completed, inProgress, notStarted],
+                            backgroundColor: ['#10b981', '#f59e0b', '#6366f1'],
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1f2937',
+                                    font: { size: 12, family: 'Inter' }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                };
+            }, [projects]);
+
+            if (projects.length === 0) {
+                return (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                        <p>No hay datos para mostrar</p>
+                    </div>
+                );
+            }
+
+            return <canvas ref={chartRef}></canvas>;
+        };
+
+        // Login
+        function LoginScreen() {
+            const [mode, setMode] = useState('login');
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+                try {
+                    if (mode === 'login') await auth.signInWithEmailAndPassword(email, password);
+                    else if (mode === 'register') {
+                        if (password !== confirmPassword) throw new Error('Las contraseñas no coinciden');
+                        if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
+                        await auth.createUserWithEmailAndPassword(email, password);
+                    } else {
+                        await auth.sendPasswordResetEmail(email);
+                        setSuccess('Correo de recuperación enviado');
+                        setTimeout(() => setMode('login'), 3000);
+                    }
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleGoogleLogin = async () => {
+                try {
+                    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 max-w-md w-full animate-slide-in-up">
+                        <div className="text-center mb-8">
+                            <div className="mb-6 inline-block p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl">
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </div>
+                            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">YectosPro</h1>
+                            <p className="text-gray-600">{mode === 'login' ? 'Inicia sesión en tu cuenta' : mode === 'register' ? 'Crea tu cuenta nueva' : 'Recupera tu contraseña'}</p>
+                        </div>
+                        {error && <div className="bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg mb-6"><p className="font-medium">{error}</p></div>}
+                        {success && <div className="bg-green-50 border-l-4 border-green-500 text-green-800 px-4 py-3 rounded-lg mb-6"><p className="font-medium">{success}</p></div>}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo electrónico" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required />
+                            {mode !== 'reset' && <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required />}
+                            {mode === 'register' && <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirmar contraseña" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required />}
+                            <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">{loading ? 'Cargando...' : mode === 'login' ? 'Iniciar Sesión' : mode === 'register' ? 'Crear Cuenta' : 'Enviar Correo'}</button>
+                        </form>
+                        {mode === 'login' && <div className="mt-4 text-right"><button onClick={() => setMode('reset')} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold">¿Olvidaste tu contraseña?</button></div>}
+                        <div className="mt-6">
+                            <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">O continúa con</span></div></div>
+                            <button onClick={handleGoogleLogin} disabled={loading} className="mt-4 w-full bg-white border-2 border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 disabled:opacity-50">Google</button>
+                        </div>
+                        <div className="mt-6 text-center">
+                            {mode === 'login' && <p className="text-sm text-gray-600">¿No tienes cuenta? <button onClick={() => setMode('register')} className="text-indigo-600 font-semibold hover:text-indigo-800">Regístrate aquí</button></p>}
+                            {mode !== 'login' && <p className="text-sm text-gray-600">¿Ya tienes cuenta? <button onClick={() => setMode('login')} className="text-indigo-600 font-semibold hover:text-indigo-800">Inicia sesión</button></p>}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Project Form Modal
+        function ProjectFormModal({ isOpen, onClose, onSave, project, addToast }) {
+            const [formData, setFormData] = useState({ name: '', client: '', totalCost: '', stages: [{ id: Date.now(), name: '' }] });
+
+            useEffect(() => {
+                if (project) setFormData({ ...project, totalCost: project.totalCost.toString() });
+                else setFormData({ name: '', client: '', totalCost: '', stages: [{ id: Date.now(), name: '' }] });
+            }, [project, isOpen]);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                await onSave({ ...formData, totalCost: parseFloat(formData.totalCost) || 0 });
+                onClose();
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-in-up" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 flex justify-between items-center">
+                            <h2 className="text-2xl font-bold">{project ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h2>
+                            <button onClick={onClose} className="hover:bg-white/20 rounded-full p-2 transition-all"><XIcon /></button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+                            <div><label className="block font-bold text-gray-700 dark:text-gray-300 mb-2">Nombre del Proyecto</label><input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required /></div>
+                            <div><label className="block font-bold text-gray-700 dark:text-gray-300 mb-2">Cliente</label><input type="text" value={formData.client} onChange={(e) => setFormData({...formData, client: e.target.value})} className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required /></div>
+                            <div><label className="block font-bold text-gray-700 dark:text-gray-300 mb-2">Costo Total</label><input type="number" value={formData.totalCost} onChange={(e) => setFormData({...formData, totalCost: e.target.value})} className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500" required min="0" step="0.01" /></div>
+                            <div>
+                                <label className="block font-bold text-gray-700 dark:text-gray-300 mb-2">Etapas del Proyecto</label>
+                                {formData.stages.map((stage, i) => (
+                                    <div key={stage.id} className="flex gap-2 mb-2">
+                                        <input type="text" value={stage.name} onChange={(e) => {
+                                            const newStages = [...formData.stages];
+                                            newStages[i].name = e.target.value;
+                                            setFormData({...formData, stages: newStages});
+                                        }} placeholder={`Etapa ${i + 1}`} className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl" required />
+                                        {formData.stages.length > 1 && <button type="button" onClick={() => setFormData({...formData, stages: formData.stages.filter((_, idx) => idx !== i)})} className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-4 rounded-xl hover:bg-red-200"><TrashIcon /></button>}
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => setFormData({...formData, stages: [...formData.stages, { id: Date.now(), name: '' }]})} className="w-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 py-2 rounded-xl hover:bg-indigo-200 font-semibold flex items-center justify-center gap-2"><PlusIcon /> Añadir Etapa</button>
+                            </div>
+                            <div className="flex gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                <button type="button" onClick={onClose} className="flex-1 bg-gray-200 dark:bg-gray-700 dark:text-white py-3 rounded-xl font-semibold hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700">Guardar Proyecto</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // Project Detail Modal
+        function ProjectDetailModal({ project, onClose, onUpdate, addToast }) {
+            const [notes, setNotes] = useState([]);
+            const [newNote, setNewNote] = useState('');
+            const [newPayment, setNewPayment] = useState('');
+            const [activities, setActivities] = useState([]);
+
+            useEffect(() => {
+                if (!project) return;
+                const unsubscribe = db.collection('projects').doc(project.id).collection('notes').orderBy('createdAt', 'desc').onSnapshot(
+                    (snapshot) => setNotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => console.error('Error loading notes:', error)
+                );
+                return () => unsubscribe();
+            }, [project]);
+
+            useEffect(() => {
+                if (!project) return;
+                const unsubscribe = db.collection('projects').doc(project.id).collection('activities').orderBy('timestamp', 'desc').limit(10).onSnapshot(
+                    (snapshot) => setActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => console.error('Error loading activities:', error)
+                );
+                return () => unsubscribe();
+            }, [project]);
+
+            const addActivity = async (type, description) => {
+                try {
+                    await db.collection('projects').doc(project.id).collection('activities').add({
+                        type,
+                        description,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error('Error adding activity:', error);
+                }
+            };
+
+            const handleAddNote = async (e) => {
+                e.preventDefault();
+                if (!newNote.trim()) return;
+                try {
+                    await db.collection('projects').doc(project.id).collection('notes').add({
+                        text: newNote,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await addActivity('note', `Nota agregada: "${newNote.substring(0, 30)}..."`);
+                    setNewNote('');
+                    addToast('Nota agregada exitosamente', 'success');
+                } catch (error) {
+                    addToast('Error al agregar nota', 'error');
+                }
+            };
+
+            const handleDeleteNote = async (noteId) => {
+                try {
+                    await db.collection('projects').doc(project.id).collection('notes').doc(noteId).delete();
+                    await addActivity('note', 'Nota eliminada');
+                    addToast('Nota eliminada', 'success');
+                } catch (error) {
+                    addToast('Error al eliminar nota', 'error');
+                }
+            };
+
+            const handleStageToggle = async (stageId) => {
+                const stage = project.stages.find(s => s.id === stageId);
+                const wasCompleted = stage.completed || false;
+                const updatedStages = project.stages.map(s =>
+                    s.id === stageId ? {...s, completed: !wasCompleted} : s
+                );
+                try {
+                    await onUpdate({...project, stages: updatedStages});
+                    await addActivity('stage', `Etapa "${stage.name}" marcada como ${!wasCompleted ? 'completada' : 'pendiente'}`);
+                    addToast('Etapa actualizada', 'success');
+                } catch (error) {
+                    console.error('Error al actualizar etapa:', error);
+                    addToast('Error al actualizar etapa: ' + error.message, 'error');
+                }
+            };
+
+            const handleAddPayment = async (e) => {
+                e.preventDefault();
+                const amount = parseFloat(newPayment);
+                if (isNaN(amount) || amount <= 0) return;
+                try {
+                    await onUpdate({...project, amountPaid: Math.min(project.amountPaid + amount, project.totalCost)});
+                    await addActivity('payment', `Pago registrado: ${formatCurrency(amount)}`);
+                    setNewPayment('');
+                    addToast(`Pago de ${formatCurrency(amount)} registrado correctamente`, 'success');
+                } catch (error) {
+                    addToast('Error al registrar pago', 'error');
+                }
+            };
+
+            const handleShare = () => {
+                const url = `${window.location.origin}?project=${project.id}`;
+                copyToClipboard(url);
+                addToast('Enlace copiado al portapapeles', 'success');
+            };
+
+            if (!project) return null;
+
+            const progress = project.stages?.length > 0 ? Math.round((project.stages.filter(s => s.completed).length / project.stages.length) * 100) : 0;
+            const balanceDue = project.totalCost - project.amountPaid;
+
+            const getActivityIcon = (type) => {
+                switch (type) {
+                    case 'payment': return <DollarIcon />;
+                    case 'stage': return <CheckIcon />;
+                    case 'note': return <MessageIcon />;
+                    default: return <ClockIcon />;
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-in-up" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 flex justify-between items-center">
+                            <div><p className="text-sm font-medium text-indigo-100">{project.client}</p><h2 className="text-3xl font-bold mt-1">{project.name}</h2></div>
+                            <div className="flex gap-2">
+                                <button onClick={handleShare} className="hover:bg-white/20 rounded-full p-2 transition-all" title="Compartir proyecto"><ShareIcon /></button>
+                                <button onClick={onClose} className="hover:bg-white/20 rounded-full p-2 transition-all"><XIcon /></button>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2 space-y-6">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="text-lg font-bold dark:text-white">Progreso del Proyecto</h3>
+                                            <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{progress}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
+                                            <div className="progress-bar bg-gradient-to-r from-indigo-500 to-purple-600 h-5 rounded-full" style={{width: `${progress}%`}}></div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-blue-50 dark:bg-blue-900/30 p-5 rounded-xl border-l-4 border-blue-500">
+                                            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Costo Total</p>
+                                            <p className="text-2xl font-bold dark:text-white mt-1">{formatCurrency(project.totalCost)}</p>
+                                        </div>
+                                        <div className="bg-green-50 dark:bg-green-900/30 p-5 rounded-xl border-l-4 border-green-500">
+                                            <p className="text-sm text-green-600 dark:text-green-400 font-medium">Monto Cobrado</p>
+                                            <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{formatCurrency(project.amountPaid)}</p>
+                                        </div>
+                                        <div className="bg-red-50 dark:bg-red-900/30 p-5 rounded-xl border-l-4 border-red-500">
+                                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">Saldo Pendiente</p>
+                                            <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{formatCurrency(balanceDue)}</p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-lg font-bold dark:text-white mb-4">Etapas del Proyecto</h3>
+                                        <div className="space-y-3">
+                                            {project.stages?.map((stage, i) => {
+                                                const isCompleted = stage.completed || false;
+                                                const labelClass = `flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-indigo-300'}`;
+                                                return (
+                                                    <label key={stage.id} className={labelClass}>
+                                                        <input type="checkbox" checked={isCompleted} onChange={() => handleStageToggle(stage.id)} className="h-6 w-6 rounded-lg border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2" />
+                                                        <span className={`ml-4 flex-1 font-medium ${isCompleted ? 'text-gray-500 line-through' : 'dark:text-white'}`}>{stage.name}</span>
+                                                        <span className="text-sm text-gray-400">Etapa {i + 1}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl p-6">
+                                        <h3 className="text-lg font-bold dark:text-white mb-4 flex items-center gap-2"><DollarIcon /> Registrar Nuevo Pago</h3>
+                                        <form onSubmit={handleAddPayment} className="flex gap-3">
+                                            <div className="relative flex-1">
+                                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                    <span className="text-gray-500 font-semibold">$</span>
+                                                </div>
+                                                <input type="number" value={newPayment} onChange={(e) => setNewPayment(e.target.value)} placeholder="Monto del pago" min="0.01" step="0.01" disabled={balanceDue <= 0} className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" />
+                                            </div>
+                                            <button type="submit" disabled={balanceDue <= 0} className="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">Registrar</button>
+                                        </form>
+                                        {balanceDue <= 0 && <p className="mt-3 text-sm text-green-700 dark:text-green-400 font-semibold">✓ El proyecto está completamente pagado</p>}
+                                    </div>
+
+                                    <div className="bg-purple-50 dark:bg-purple-900/30 rounded-2xl p-6">
+                                        <h3 className="text-lg font-bold dark:text-white mb-4 flex items-center gap-2"><MessageIcon /> Notas y Comentarios</h3>
+                                        <form onSubmit={handleAddNote} className="mb-4">
+                                            <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota o comentario sobre el proyecto..." className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl resize-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500" rows="3"></textarea>
+                                            <button type="submit" className="mt-2 bg-purple-600 text-white px-6 py-2 rounded-xl font-semibold hover:bg-purple-700 transition-all">Agregar Nota</button>
+                                        </form>
+                                        <div className="space-y-3 max-h-60 overflow-y-auto">
+                                            {notes.map(note => (
+                                                <div key={note.id} className="bg-white dark:bg-gray-700 p-4 rounded-xl flex justify-between items-start shadow-sm">
+                                                    <div className="flex-1">
+                                                        <p className="dark:text-white">{note.text}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate(note.createdAt)}</p>
+                                                    </div>
+                                                    <button onClick={() => handleDeleteNote(note.id)} className="text-red-500 hover:text-red-700 ml-3 transition-colors"><TrashIcon /></button>
+                                                </div>
+                                            ))}
+                                            {notes.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-8">No hay notas aún. Agrega la primera nota del proyecto.</p>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-200 dark:border-gray-700">
+                                        <h3 className="text-lg font-bold dark:text-white mb-4 flex items-center gap-2"><ChartIcon /> Estado de Proyectos</h3>
+                                        <div className="h-64">
+                                            <ProjectCharts projects={[project]} />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-200 dark:border-gray-700">
+                                        <h3 className="text-lg font-bold dark:text-white mb-4 flex items-center gap-2"><ClockIcon /> Actividad Reciente</h3>
+                                        <div className="space-y-3">
+                                            {activities.map(activity => (
+                                                <div key={activity.id} className="flex gap-3 items-start">
+                                                    <div className="mt-1 text-indigo-600 dark:text-indigo-400">{getActivityIcon(activity.type)}</div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm dark:text-white">{activity.description}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateShort(activity.timestamp)}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {activities.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">No hay actividad registrada</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App
+        function App() {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [projects, setProjects] = useState([]);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [editingProject, setEditingProject] = useState(null);
+            const [isFormOpen, setIsFormOpen] = useState(false);
+            const [deletingId, setDeletingId] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [isDark, setIsDark] = useDarkMode();
+            const { toasts, addToast, removeToast } = useToast();
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    setUser(user);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const unsubscribe = db.collection('projects').where('userId', '==', user.uid).orderBy('createdAt', 'desc').onSnapshot(
+                    (snapshot) => setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => addToast('Error al cargar proyectos', 'error')
+                );
+                return () => unsubscribe();
+            }, [user]);
+
+            const handleSaveProject = async (projectData) => {
+                try {
+                    if (projectData.id) {
+                        const { id, ...data } = projectData;
+                        await db.collection('projects').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        addToast('Proyecto actualizado correctamente', 'success');
+                    } else {
+                        await db.collection('projects').add({ ...projectData, userId: user.uid, amountPaid: 0, stages: projectData.stages.map(s => ({ ...s, completed: false })), createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        addToast('Proyecto creado exitosamente', 'success');
+                    }
+                } catch (error) {
+                    addToast('Error al guardar el proyecto', 'error');
+                }
+            };
+
+            const handleUpdateProject = async (updatedProject) => {
+                try {
+                    const { id, ...data } = updatedProject;
+                    await db.collection('projects').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                } catch (error) {
+                    throw error;
+                }
+            };
+
+            const handleDelete = async (id) => {
+                try {
+                    await db.collection('projects').doc(id).delete();
+                    setDeletingId(null);
+                    addToast('Proyecto eliminado correctamente', 'success');
+                } catch (error) {
+                    addToast('Error al eliminar el proyecto', 'error');
+                }
+            };
+
+            const filteredProjects = useMemo(() => {
+                if (!searchQuery) return projects;
+                return projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.client.toLowerCase().includes(searchQuery.toLowerCase()));
+            }, [projects, searchQuery]);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-20 w-20 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
+                            <p className="mt-6 text-lg text-gray-700 dark:text-gray-300 font-semibold">Cargando YectosPro...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!user) return <LoginScreen />;
+
+            return (
+                <div className="min-h-screen pb-12">
+                    <ToastContainer toasts={toasts} removeToast={removeToast} />
+                    <div className="container mx-auto px-4 py-8">
+                        <header className="mb-10">
+                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                                <div>
+                                    <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">YectosPro</h1>
+                                    <p className="text-gray-600 dark:text-gray-400 mt-2">Bienvenido, <span className="font-bold text-indigo-600 dark:text-indigo-400">{user.email}</span></p>
+                                </div>
+                                <div className="flex gap-3 flex-wrap">
+                                    <button onClick={() => setIsDark(!isDark)} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2 transition-all">
+                                        {isDark ? <SunIcon /> : <MoonIcon />}
+                                        <span className="hidden sm:inline">{isDark ? 'Claro' : 'Oscuro'}</span>
+                                    </button>
+                                    <button onClick={() => exportToCSV(projects)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all">
+                                        <DownloadIcon /> <span className="hidden sm:inline">Exportar CSV</span>
+                                    </button>
+                                    <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">
+                                        <PlusIcon /> Nuevo Proyecto
+                                    </button>
+                                    <button onClick={() => auth.signOut()} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all">Salir</button>
+                                </div>
+                            </div>
+                            {projects.length > 0 && (
+                                <div className="mt-6">
+                                    <input type="text" placeholder="Buscar proyectos por nombre o cliente..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full md:w-96 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all" />
+                                </div>
+                            )}
+                        </header>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-300">
+                                <p className="text-blue-100 text-sm font-medium">Total Proyectos</p>
+                                <p className="text-3xl font-bold mt-2">{projects.length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-300">
+                                <p className="text-green-100 text-sm font-medium">Completados</p>
+                                <p className="text-3xl font-bold mt-2">{projects.filter(p => p.stages?.every(s => s.completed)).length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-300">
+                                <p className="text-yellow-100 text-sm font-medium">En Progreso</p>
+                                <p className="text-3xl font-bold mt-2">{projects.filter(p => p.stages?.some(s => s.completed) && !p.stages?.every(s => s.completed)).length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-300">
+                                <p className="text-purple-100 text-sm font-medium">Ingresos Totales</p>
+                                <p className="text-2xl font-bold mt-2">{formatCurrency(projects.reduce((sum, p) => sum + (p.totalCost || 0), 0))}</p>
+                            </div>
+                        </div>
+
+                        {projects.length > 0 && (
+                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
+                                <h2 className="text-2xl font-bold dark:text-white mb-4 flex items-center gap-2">
+                                    <ChartIcon /> Visión General de Proyectos
+                                </h2>
+                                <div className="h-80">
+                                    <ProjectCharts projects={projects} />
+                                </div>
+                            </div>
+                        )}
+
+                        {filteredProjects.length === 0 ? (
+                            <div className="text-center py-20">
+                                <div className="inline-block p-6 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-3xl mb-6">
+                                    <svg className="w-24 h-24 text-indigo-300 dark:text-indigo-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                </div>
+                                <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-3">{searchQuery ? 'No se encontraron proyectos' : 'No tienes proyectos aún'}</h2>
+                                <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">{searchQuery ? 'Intenta ajustar los filtros de búsqueda' : 'Comienza creando tu primer proyecto para gestionar tu trabajo'}</p>
+                                {!searchQuery && <button onClick={() => setIsFormOpen(true)} className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 px-8 rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"><PlusIcon /> Crear Primer Proyecto</button>}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {filteredProjects.map(project => (
+                                    <div key={project.id} className="project-card bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+                                        <div className="p-6">
+                                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{project.name}</h3>
+                                            <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">{project.client}</p>
+                                            <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                                                <div><p className="text-xs text-gray-500 dark:text-gray-400">Total</p><p className="font-bold dark:text-white">{formatCurrency(project.totalCost)}</p></div>
+                                                <div><p className="text-xs text-gray-500 dark:text-gray-400">Pagado</p><p className="font-bold text-green-600 dark:text-green-400">{formatCurrency(project.amountPaid)}</p></div>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex gap-2">
+                                            <button onClick={() => setSelectedProject(project)} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-semibold transition-all">Ver Detalles</button>
+                                            <button onClick={() => { setEditingProject(project); setIsFormOpen(true); }} className="bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 px-4 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-all"><EditIcon /></button>
+                                            <button onClick={() => setDeletingId(project.id)} className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-4 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 transition-all"><TrashIcon /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <ProjectFormModal isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setEditingProject(null); }} onSave={handleSaveProject} project={editingProject} addToast={addToast} />
+                    <ProjectDetailModal project={selectedProject} onClose={() => setSelectedProject(null)} onUpdate={handleUpdateProject} addToast={addToast} />
+
+                    {deletingId && (
+                        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setDeletingId(null)}>
+                            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md animate-slide-in-up" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-xl font-bold mb-2 dark:text-white">¿Eliminar proyecto?</h3>
+                                <p className="text-gray-600 dark:text-gray-400 mb-6">Esta acción no se puede deshacer y se perderán todos los datos asociados.</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setDeletingId(null)} className="flex-1 bg-gray-200 dark:bg-gray-700 dark:text-white py-2 rounded-lg hover:bg-gray-300 font-semibold">Cancelar</button>
+                                    <button onClick={() => handleDelete(deletingId)} className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 font-semibold">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
