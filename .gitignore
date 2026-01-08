@@ -5,6 +5,12 @@
 .env.local
 .env.production
 
+# Build output
+dist
+dist-ssr
+build
+*.local
+
 
 
 

@@ -13,7 +13,15 @@
       "Bash(del fix-html.js)",
       "Bash(node generate-complete.js)",
       "Bash(firebase deploy:*)",
-      "Bash(firebase login:list:*)"
+      "Bash(firebase login:list:*)",
+      "Bash(npm install)",
+      "Bash(timeout 10 dir:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Rediseño completo a aplicación web profesional de primer mundo\n\n- Arquitectura moderna con React 18 + TypeScript + Vite\n- UI/UX avanzada con Framer Motion y Tailwind CSS\n- Dashboard interactivo con estadísticas y gráficos en tiempo real\n- Sistema de autenticación mejorado \\(Email/Google OAuth\\)\n- Gestión completa de proyectos con etapas personalizables\n- Control financiero con seguimiento de pagos\n- Modo oscuro/claro/automático\n- Diseño responsive \\(móvil, tablet, desktop\\)\n- PWA con funcionamiento offline\n- Performance optimizado con code splitting\n- Sincronización en tiempo real con Firebase\n- TypeScript para mayor robustez\n- State management con Zustand\n- Data fetching con React Query\n- Visualización de datos con Recharts\n- Componentes UI reutilizables\n- Animaciones fluidas y micro-interacciones\n\n🚀 Deployed at: https://yectospro.web.app\n\n🤖 Generated with Claude Code \\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []
