@@ -4,7 +4,7 @@ import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/useAuthStore'
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { setUser, setLoading } = useAuthStore()
+  const { setUser } = useAuthStore()
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     })
 
     return () => unsubscribe()
-  }, [setUser, setLoading])
+  }, [setUser])
 
   return <>{children}</>
 }
